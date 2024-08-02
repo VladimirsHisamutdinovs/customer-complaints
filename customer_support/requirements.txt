@@ -1,0 +1,4 @@
+ollama
+kafka-python
+neo4j
+psycopg2

@@ -9,6 +9,10 @@ class KafkaConsumerClient:
             value_deserializer=lambda x: json.loads(x.decode('utf-8'))
         )
 
-    def consume_messages(self, callback):
+    def consume_messages(self):
         for message in self.consumer:
-            callback(message.value)
+            print(f"Received message: {message.value}")
+
+if __name__ == "__main__":
+    consumer = KafkaConsumerClient(topic='some_topic', bootstrap_servers='kafka:9092')
+    consumer.consume_messages()

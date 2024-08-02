@@ -50,10 +50,20 @@ services:
       - postgres_data:/var/lib/postgresql/data
       - ./path/to/tables.sql:/docker-entrypoint-initdb.d/tables.sql
 
-  llm_agents:
+  customer_agent:
     build:
-      context: .
-      dockerfile: agents/Dockerfile
+      context: ./customer
+      dockerfile: Dockerfile
+    depends_on:
+      kafka:
+        condition: service_healthy
+    networks:
+      - telecom_network
+
+  customer_support_agent:
+    build:
+      context: ./customer_support
+      dockerfile: Dockerfile
     depends_on:
       kafka:
         condition: service_healthy
@@ -61,32 +71,29 @@ services:
         condition: service_started
       postgres:
         condition: service_started
-      ollama:
-        condition: service_healthy
     networks:
       - telecom_network
 
-  ollama:
-    image: ollama/ollama:latest
-    container_name: ollama
-    ports:
-      - "11434:11434"
-    volumes:
-      - ollama:/root/.ollama
-    restart: always
+  kafka_producer:
+    build:
+      context: ./kafka_queues
+      dockerfile: Dockerfile
     networks:
       - telecom_network
-    healthcheck:
-      test: ["CMD-SHELL", "apt-get update && apt-get install -y curl && curl -f http://localhost:11434 || exit 1"]
-      interval: 30s
-      timeout: 10s
-      retries: 5
+    command: ["python", "kafka_producer.py"]
+
+  kafka_consumer:
+    build:
+      context: ./kafka_queues
+      dockerfile: Dockerfile
+    networks:
+      - telecom_network
+    command: ["python", "kafka_consumer.py"]
 
 networks:
   telecom_network:
     driver: bridge
 
 volumes:
-  ollama:
-  postgres_data:
   neo4j_data:
+  postgres_data:
