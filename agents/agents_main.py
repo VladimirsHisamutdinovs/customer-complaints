@@ -1,13 +1,10 @@
-"""
-Main module to initialize and run the agents.
-"""
 from customer_agent import CustomerAgent
 from customer_support_agent import CustomerSupportAgent
 
 def main():
-    kafka_bootstrap_servers = 'localhost:9092'
+    kafka_bootstrap_servers = 'kafka:9092'  # Use service name as per docker-compose
     neo4j_config = {
-        "uri": "bolt://localhost:7687",
+        "uri": "bolt://neo4j:7687",
         "user": "neo4j",
         "password": "password"
     }
@@ -15,7 +12,7 @@ def main():
         "dbname": "complaints_db",
         "user": "user",
         "password": "password",
-        "host": "localhost"
+        "host": "postgres"
     }
 
     complaint_generator = CustomerAgent(kafka_bootstrap_servers)

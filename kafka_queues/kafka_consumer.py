@@ -1,6 +1,3 @@
-"""
-Kafka Consumer module to consume messages from Kafka topics.
-"""
 from kafka import KafkaConsumer
 import json
 

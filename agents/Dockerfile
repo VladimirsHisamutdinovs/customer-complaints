@@ -1,13 +1,14 @@
-FROM python:3.9
+FROM python:3.10.12-bullseye
 
-# Install required packages
 RUN pip install ollama kafka-python neo4j psycopg2
 
-# Copy your application code
+COPY scripts/wait-for-it.sh /wait-for-it.sh
 COPY . /app
 
-# Set the working directory
 WORKDIR /app
 
-# Run the application
-CMD ["python", "main.py"]
+ENV PYTHONPATH=/app
+
+RUN chmod +x /wait-for-it.sh
+
+ENTRYPOINT ["/wait-for-it.sh", "kafka:9092", "--timeout=180", "--", "python", "agents/agents_main.py"]

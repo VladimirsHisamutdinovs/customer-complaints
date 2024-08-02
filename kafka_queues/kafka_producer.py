@@ -1,6 +1,3 @@
-"""
-Kafka Producer module to send messages to Kafka topics.
-"""
 from kafka import KafkaProducer
 import json
 
