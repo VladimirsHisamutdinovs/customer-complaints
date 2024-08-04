@@ -1,11 +1,5 @@
-# neo4j_graphdb/Dockerfile
-FROM python:3.10.12-bullseye
+FROM neo4j:latest
 
-WORKDIR /app
+COPY init_neo4j.sh /docker-entrypoint-initdb.d/
 
-COPY requirements.txt requirements.txt
-RUN pip install --no-cache-dir -r requirements.txt
-
-COPY . .
-
-CMD ["python", "neo4j_client.py"]
+RUN chmod +x /docker-entrypoint-initdb.d/init_neo4j.sh

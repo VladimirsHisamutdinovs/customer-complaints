@@ -1,17 +1,24 @@
-# customer_support/Dockerfile
 FROM python:3.10.12-bullseye
 
-WORKDIR /app
+WORKDIR /app/customer_support
 
-COPY requirements.txt requirements.txt
+# Copy the application code
+COPY . .
+
+# Install required Python packages
 RUN pip install --no-cache-dir -r requirements.txt
 
-# Assuming additional installation steps for ollama (e.g., curl) if necessary
-RUN apt-get update && apt-get install -y curl
+# Install Ollama
+RUN curl -L https://ollama.com/install.sh | bash
 
-COPY . .
+# Make scripts executable
 RUN chmod +x wait-for-it.sh
+RUN chmod +x run-ollama.sh
 
-ENV PYTHONPATH="${PYTHONPATH}:/app"
+# Expose the necessary port
+EXPOSE 11434
 
-ENTRYPOINT ["./wait-for-it.sh", "kafka:9092", "--timeout=180", "--", "python", "customer_support_agent.py"]
+ENV PYTHONPATH="${PYTHONPATH}:/app:/customer_support"
+
+ENTRYPOINT ["./wait-for-it.sh", "redis:6379", "--", "./run-ollama.sh"]
+CMD ["python", "./customer_support_agent.py"]

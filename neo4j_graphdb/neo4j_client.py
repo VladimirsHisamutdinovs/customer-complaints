@@ -12,9 +12,11 @@ class Neo4jClient:
 
     def store_complaint(self, complaint):
         with self.driver.session() as session:
+            print("Storing complaint:", complaint) 
             session.run(
                 "CREATE (c:Complaint {customer_id: $customer_id, location: $location, text: $text})",
                 customer_id=complaint["customer_id"],
                 location=complaint["location"],
                 text=complaint["complaint_text"]
             )
+
