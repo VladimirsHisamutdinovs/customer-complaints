@@ -109,6 +109,28 @@ services:
       customer_support_agent:
         condition: service_started
 
+  timeseries_generator:
+    build:
+      context: ./timeseries_generator
+      dockerfile: Dockerfile
+    depends_on:
+      redis:
+        condition: service_healthy
+    networks:
+      - telecom_network
+
+  alerter:
+    build:
+      context: ./alerter
+      dockerfile: Dockerfile
+    depends_on:
+      redis:
+        condition: service_healthy
+      timeseries_generator:
+        condition: service_started
+    networks:
+      - telecom_network
+
 networks:
   telecom_network:
     driver: bridge
