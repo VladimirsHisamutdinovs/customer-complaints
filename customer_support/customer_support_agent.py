@@ -15,26 +15,18 @@ class CustomerSupportAgent(BaseAgent):
         self.redis = Redis(host=redis_host, port=6379)
         self.neo4j_client = Neo4jClient(**neo4j_config)
         self.postgres_client = PostgresClient(**postgres_config)
-        self.ollama_client = ollama.Client(host='http://localhost:11434/api/generate')
+        self.ollama_client = ollama.Client(host='http://localhost:11434')
         self.ollama_client.base_url = ollama_url
 
+# TODO: put complaint on the resolver queue
     def process_complaint(self, complaint):
         logging.info(f"Processing complaint: {complaint}")
-        category = self._classify_complaint(complaint["complaint_text"])
-        self._store_complaint(complaint, category)
-        return category
+        self._store_complaint(complaint)
+        return 
 
-    def _classify_complaint(self, complaint_text):
-        prompt = f"Classify the following complaint: {complaint_text}."
-        response = self.ollama_client.generate(prompt=prompt, model="phi3")
-        return 'financial' if 'financial' in response['text'].lower() else 'technical'
-
-    def _store_complaint(self, complaint, category):
+    def _store_complaint(self, complaint):
         self.neo4j_client.store_complaint(complaint)
-        if category == 'financial':
-            self.postgres_client.store_financial_complaint(complaint)
-        else:
-            self.postgres_client.store_technical_complaint(complaint)
+        self.postgres_client.store_technical_complaint(complaint)
 
     def run(self):
         while True:
@@ -43,11 +35,7 @@ class CustomerSupportAgent(BaseAgent):
                 stream, messages = complaints[0]
                 for message_id, complaint in messages:
                     logging.info(f"Received complaint: {complaint}")
-                    category = self.process_complaint(complaint)
-                    if category == 'financial':
-                        self.redis.xadd('financial_complaints', complaint)
-                    else:
-                        self.redis.xadd('technical_complaints', complaint)
+                    self.redis.xadd('technical_complaints', complaint)  # Always add to technical complaints stream
                     self.redis.xack('customer_complaints', stream, message_id)
 
 if __name__ == "__main__":

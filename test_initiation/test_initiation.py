@@ -1,4 +1,5 @@
 from redis import Redis, ConnectionError
+import time
 
 def initiate_complaint(redis_host):
     try:
@@ -12,3 +13,4 @@ def initiate_complaint(redis_host):
 if __name__ == "__main__":
     while True:
         initiate_complaint(redis_host='redis')
+        time.sleep(10)  # Sleep for 10 seconds

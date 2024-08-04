@@ -20,11 +20,13 @@ class CustomerAgent(BaseAgent):
             "complaint_text": complaint_text
         }
 
+# TODO: add info from the alerter
     def _generate_complaint_text(self):
         consequences = ["internet down", "slow speed", "no connection"]
         consequence = random.choice(consequences)
         prompt = f"Generate a customer complaint based on the following issue: {consequence}."
         response = self.ollama_client.generate( model="phi3", prompt=prompt)
+        print(response)
         return response['text']
 
     def run(self):
