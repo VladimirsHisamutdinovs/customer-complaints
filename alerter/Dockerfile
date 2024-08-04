@@ -1,7 +1,8 @@
+# Use the official Python image from the Docker Hub
 FROM python:3.10.12-bullseye
 
 # Set the working directory in the container
-WORKDIR /app/timeseries_generator
+WORKDIR /app/alerter
 
 # Copy the requirements file into the container
 COPY . .
@@ -13,4 +14,8 @@ RUN pip install --no-cache-dir -r requirements.txt
 
 
 # Command to run the application
-CMD ["python", "timeseries_generator.py"]
+CMD ["python", "alerter.py"]
+
+
+
+
