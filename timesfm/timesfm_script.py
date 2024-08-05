@@ -1,10 +1,9 @@
-import numpy as np
 import pandas as pd
-import time
-import redis
 import psycopg2
-import timesfm
+import redis
 import json
+import time
+from transformers import AutoModelForSeq2SeqLM, AutoTokenizer
 
 # Initialize Redis connection
 redis_host = 'redis'
@@ -32,8 +31,10 @@ class LiveNetworkTimeSeriesGenerator:
         self.random_outliers = self.generate_random_outliers()
         self.weather_impact = self.generate_weather_impact()
         self.user_count_base = 1000
-        self.model = timesfm.TimesFM()  # Initialize the TimesFM model
-        self.initial_train_model()  # Train the model initially
+
+        # Load the model and tokenizer from Hugging Face
+        self.tokenizer = AutoTokenizer.from_pretrained("google/timesfm-1.0-200m")
+        self.model = AutoModelForSeq2SeqLM.from_pretrained("google/timesfm-1.0-200m")
 
     def generate_daily_cycle(self):
         return 30 * np.sin(self.time * 2 * np.pi / 24)
@@ -117,19 +118,13 @@ class LiveNetworkTimeSeriesGenerator:
         conn.commit()
 
     def feed_to_model(self, data):
-        # Assuming the model expects data in a certain format
-        features = [[data['network_load'], data['throughput'], data['latency'], data['user_count']]]
-        prediction = self.model.predict(features)
+        # Prepare input for the model
+        input_text = json.dumps(data)
+        inputs = self.tokenizer(input_text, return_tensors="pt")
+        # Perform prediction
+        outputs = self.model.generate(**inputs)
+        prediction = self.tokenizer.decode(outputs[0], skip_special_tokens=True)
         print(f"Model prediction for day {data['time']}: {prediction}")
-
-    def initial_train_model(self):
-        # Load initial data from PostgreSQL to train the model
-        df = pd.read_sql_query("SELECT * FROM timeseries_data", conn)
-        if not df.empty:
-            times = df['time'].values
-            features = df[['network_load', 'throughput', 'latency', 'user_count']].values
-            self.model.fit(times, features)
-            print("Initial model training complete.")
 
 def generate_and_process_data(generator, duration=365, interval=1):
     day = 0

@@ -3,3 +3,4 @@ pandas
 matplotlib
 redis
 psycopg2
+timesfm

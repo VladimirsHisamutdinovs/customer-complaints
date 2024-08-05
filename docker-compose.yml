@@ -46,24 +46,48 @@ services:
     networks:
       - telecom_network
 
-  postgres:
-    image: postgres:latest
-    ports:
-      - "5432:5432"
+  timeseries_db:
+    image: timescale/timescaledb-ha:pg14-latest
+    container_name: timescale_postgres
     environment:
-      POSTGRES_DB: complaints_db
       POSTGRES_USER: user
       POSTGRES_PASSWORD: password
+      POSTGRES_DB: timeseries_db
+    ports:
+      - "5433:5432"
+    volumes:
+      - timeseries_pgdata:/var/lib/postgresql/data
+      - ./postgres/timeseries_init.sql:/docker-entrypoint-initdb.d/init.sql
     networks:
       - telecom_network
-    volumes:
-      - postgres_data:/var/lib/postgresql/data
-      - ./postgres/tables.sql:/docker-entrypoint-initdb.d/tables.sql
     depends_on:
       redis:
         condition: service_healthy
     healthcheck:
-      test: ["CMD-SHELL", "pg_isready -U user -d complaints_db"]
+      test: ["CMD-SHELL", "pg_isready -U user -d timeseries_db"]
+      interval: 30s
+      timeout: 10s
+      retries: 5
+
+  customer_complaints_db:
+    image: postgres:latest
+    container_name: customer_complaints_postgres
+    environment:
+      POSTGRES_USER: user
+      POSTGRES_PASSWORD: password
+      POSTGRES_DB: customer_complaints_db
+    ports:
+      - "5434:5432"
+    volumes:
+      - customer_pgdata:/var/lib/postgresql/data
+      - ./postgres/customer_complaints_init.sql:/docker-entrypoint-initdb.d/init.sql
+    networks:
+      - telecom_network
+    depends_on:
+      redis:
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U user -d customer_complaints_db"]
       interval: 30s
       timeout: 10s
       retries: 5
@@ -77,8 +101,17 @@ services:
         condition: service_healthy
       neo4j:
         condition: service_healthy
+      customer_complaints_db:
+        condition: service_healthy
     networks:
       - telecom_network
+    environment:
+      - REDIS_HOST=redis
+      - REDIS_PORT=6379
+      - POSTGRES_HOST=customer_complaints_db
+      - POSTGRES_DB=customer_complaints_db
+      - POSTGRES_USER=user
+      - POSTGRES_PASSWORD=password
 
   customer_support_agent:
     build:
@@ -89,10 +122,17 @@ services:
         condition: service_healthy
       neo4j:
         condition: service_healthy
-      postgres:
+      customer_complaints_db:
         condition: service_healthy
     networks:
       - telecom_network
+    environment:
+      - REDIS_HOST=redis
+      - REDIS_PORT=6379
+      - POSTGRES_HOST=customer_complaints_db
+      - POSTGRES_DB=customer_complaints_db
+      - POSTGRES_USER=user
+      - POSTGRES_PASSWORD=password
 
   test_initiation:
     build:
@@ -116,8 +156,17 @@ services:
     depends_on:
       redis:
         condition: service_healthy
+      timeseries_db:
+        condition: service_healthy
     networks:
       - telecom_network
+    environment:
+      - REDIS_HOST=redis
+      - REDIS_PORT=6379
+      - POSTGRES_HOST=timeseries_db
+      - POSTGRES_DB=timeseries_db
+      - POSTGRES_USER=user
+      - POSTGRES_PASSWORD=password
 
   alerter:
     build:
@@ -128,8 +177,30 @@ services:
         condition: service_healthy
       timeseries_generator:
         condition: service_started
+      timeseries_db:
+        condition: service_healthy
     networks:
       - telecom_network
+    environment:
+      - REDIS_HOST=redis
+      - REDIS_PORT=6379
+      - POSTGRES_HOST=timeseries_db
+      - POSTGRES_DB=timeseries_db
+      - POSTGRES_USER=user
+      - POSTGRES_PASSWORD=password
+
+  timesfm:
+    build: ./timesfm
+    depends_on:
+      timeseries_db:
+        condition: service_healthy
+    networks:
+      - telecom_network
+    environment:
+      - POSTGRES_HOST=timeseries_db
+      - POSTGRES_DB=timeseries_db
+      - POSTGRES_USER=user
+      - POSTGRES_PASSWORD=password
 
 networks:
   telecom_network:
@@ -138,3 +209,5 @@ networks:
 volumes:
   neo4j_data:
   postgres_data:
+  timeseries_pgdata:
+  customer_pgdata:
