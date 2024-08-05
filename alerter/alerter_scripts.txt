@@ -1,0 +1,3 @@
+redis-cli
+
+LRANGE alerts 0 -1
