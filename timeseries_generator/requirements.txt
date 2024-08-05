@@ -1,6 +1,5 @@
 numpy
 pandas
-matplotlib
 redis
-psycopg2
-timesfm
+neo4j
+matplotlib

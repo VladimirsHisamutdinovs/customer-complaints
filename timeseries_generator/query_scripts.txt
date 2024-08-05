@@ -1,0 +1,3 @@
+MATCH (t:TimeSeries)
+RETURN t.time AS Time, t.network_load AS NetworkLoad, t.throughput AS Throughput, t.latency AS Latency, t.user_count AS UserCount
+ORDER BY t.time

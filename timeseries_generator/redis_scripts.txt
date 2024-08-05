@@ -1,0 +1,6 @@
+redis-cli
+
+LLEN timeseries_data
+
+LRANGE timeseries_data 0 9
+
