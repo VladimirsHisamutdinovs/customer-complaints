@@ -1,20 +1,25 @@
 from redis import Redis
 import time
+import json
 
 # Initialize Redis connection
 redis_host = 'redis'
 redis_port = 6379
 r = Redis(host=redis_host, port=redis_port, db=0)
 
+ALERT_QUEUE = 'alerts'
+
 class Alerter:
     def __init__(self):
-        self.redis = Redis(host=redis_host, port=6379)
+        self.redis = Redis(host=redis_host, port=redis_port)
+        self.user_count_base = 1000  # Define the base user count
         self.alert_thresholds = {
             'network_load': {'actionable': 70, 'critical': 90},
             'throughput': {'actionable': 60, 'critical': 40},
-            'latency': {'actionable': 200, 'critical': 300}
+            'latency': {'actionable': 200, 'critical': 300},
+            'user_count': {'actionable': 0.1, 'critical': 0.9}
         }
-        self.previous_alerts = {'network_load': 0, 'throughput': 0, 'latency': 0}
+        self.previous_alerts = {'network_load': 0, 'throughput': 0, 'latency': 0, 'user_count': 0}
         self.delay_days = 3
         self.consequence_mapping = {
             'network_load': {
@@ -28,6 +33,10 @@ class Alerter:
             'latency': {
                 'actionable': "Customers may experience lag in online activities such as gaming and video calls.",
                 'critical': "Customers are experiencing significant lag in online activities, causing disruptions in gaming and video calls."
+            },
+            'user_count': {
+                'actionable': "The number of users is unusually low.",
+                'critical': "The number of users is critically low, indicating a potential service outage."
             }
         }
 
@@ -37,10 +46,16 @@ class Alerter:
         
         for key, value in data.items():
             if key != 'time':
-                if value > self.alert_thresholds[key]['critical']:
-                    alerts.append((current_day, key, 'critical'))
-                elif value > self.alert_thresholds[key]['actionable']:
-                    alerts.append((current_day, key, 'actionable'))
+                if key == 'user_count':
+                    if value < self.user_count_base * self.alert_thresholds[key]['actionable']:
+                        alerts.append((current_day, key, 'actionable'))
+                    elif value > self.user_count_base * self.alert_thresholds[key]['critical']:
+                        alerts.append((current_day, key, 'critical'))
+                else:
+                    if value > self.alert_thresholds[key]['critical']:
+                        alerts.append((current_day, key, 'critical'))
+                    elif value > self.alert_thresholds[key]['actionable']:
+                        alerts.append((current_day, key, 'actionable'))
 
         return alerts
 
@@ -55,7 +70,7 @@ class Alerter:
     def send_alert_to_redis(self, day, reason, level):
         consequence = self.consequence_mapping[reason][level]
         alert_message = f"Day: {day}, Reason: {reason}, Level: {level}, Consequence: {consequence}"
-        r.rpush('alerts', alert_message)
+        r.rpush(ALERT_QUEUE, alert_message)
         print(f"Alert triggered: {alert_message}")
 
 def process_alerts():
@@ -63,7 +78,7 @@ def process_alerts():
     while True:
         if r.llen('timeseries_data') > 0:
             data = r.lpop('timeseries_data')
-            data = eval(data)  # Convert the string back to dictionary
+            data = json.loads(data)  # Convert the JSON string back to dictionary
             alerts = alerter.check_thresholds(data)
             alerter.trigger_alerts(alerts)
         time.sleep(1)  # Check for new data every second

@@ -1,13 +1,24 @@
 import numpy as np
 import pandas as pd
-import matplotlib.pyplot as plt
 import time
 import redis
+import psycopg2
+import timesfm
+import json
 
 # Initialize Redis connection
 redis_host = 'redis'
 redis_port = 6379
 r = redis.Redis(host=redis_host, port=redis_port, db=0)
+
+# Initialize PostgreSQL connection
+conn = psycopg2.connect(
+    dbname="your_dbname",
+    user="your_user",
+    password="your_password",
+    host="postgres"
+)
+cur = conn.cursor()
 
 class LiveNetworkTimeSeriesGenerator:
     def __init__(self, num_days):
@@ -21,7 +32,8 @@ class LiveNetworkTimeSeriesGenerator:
         self.random_outliers = self.generate_random_outliers()
         self.weather_impact = self.generate_weather_impact()
         self.user_count_base = 1000
-    
+        self.model = timesfm.TimesFM()  # Initialize the TimesFM model
+
     def generate_daily_cycle(self):
         return 30 * np.sin(self.time * 2 * np.pi / 24)
     
@@ -90,11 +102,31 @@ class LiveNetworkTimeSeriesGenerator:
         }
         return data
 
-def generate_and_push_data(generator, duration=365, interval=1):
+    def push_to_redis(self, data):
+        r.rpush('timeseries_data', json.dumps(data))
+
+    def store_in_postgres(self, data):
+        cur.execute(
+            """
+            INSERT INTO timeseries_data (time, network_load, throughput, latency, user_count)
+            VALUES (%s, %s, %s, %s, %s)
+            """,
+            (data['time'], data['network_load'], data['throughput'], data['latency'], data['user_count'])
+        )
+        conn.commit()
+
+    def feed_to_model(self, data):
+        # Assuming the model expects data in a certain format
+        features = [[data['network_load'], data['throughput'], data['latency'], data['user_count']]]
+        self.model.predict(features)
+
+def generate_and_process_data(generator, duration=365, interval=1):
     day = 0
     while day < duration:
         data = generator.generate_data(day)
-        r.rpush('timeseries_data', str(data))
+        generator.push_to_redis(data)
+        generator.store_in_postgres(data)
+        generator.feed_to_model(data)
         print(f"Data generated for day {day}: {data}")
         day += 1
         time.sleep(interval)  # Simulate 1 second per day
@@ -102,4 +134,4 @@ def generate_and_push_data(generator, duration=365, interval=1):
 if __name__ == '__main__':
     num_days = 365
     generator = LiveNetworkTimeSeriesGenerator(num_days)
-    generate_and_push_data(generator, duration=num_days, interval=1)  # 1 second per simulated day
+    generate_and_process_data(generator, duration=num_days, interval=1)  # 1 second per simulated day

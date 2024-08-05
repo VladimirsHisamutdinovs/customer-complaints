@@ -10,19 +10,20 @@ from base_agent import BaseAgent
 
 logging.basicConfig(level=logging.INFO)
 
+CUSTOMER_COMPLAINT_QUEUE = 'customer_complaints'
+
 class CustomerSupportAgent(BaseAgent):
     def __init__(self, redis_host, neo4j_config, postgres_config, ollama_url):
+        super().__init__(redis_host)
         self.redis = Redis(host=redis_host, port=6379)
         self.neo4j_client = Neo4jClient(**neo4j_config)
         self.postgres_client = PostgresClient(**postgres_config)
         self.ollama_client = ollama.Client(host='http://localhost:11434')
         self.ollama_client.base_url = ollama_url
 
-# TODO: put complaint on the resolver queue
     def process_complaint(self, complaint):
         logging.info(f"Processing complaint: {complaint}")
         self._store_complaint(complaint)
-        return 
 
     def _store_complaint(self, complaint):
         self.neo4j_client.store_complaint(complaint)
@@ -30,13 +31,13 @@ class CustomerSupportAgent(BaseAgent):
 
     def run(self):
         while True:
-            complaints = self.redis.xread({'customer_complaints': '0-0'}, block=0, count=1)
+            complaints = self.redis.xread({CUSTOMER_COMPLAINT_QUEUE: '0-0'}, block=0, count=1)
             if complaints:
                 stream, messages = complaints[0]
                 for message_id, complaint in messages:
                     logging.info(f"Received complaint: {complaint}")
-                    self.redis.xadd('technical_complaints', complaint)  # Always add to technical complaints stream
-                    self.redis.xack('customer_complaints', stream, message_id)
+                    self.process_complaint(complaint)
+                    self.redis.xack(CUSTOMER_COMPLAINT_QUEUE, stream, message_id)
 
 if __name__ == "__main__":
     agent = CustomerSupportAgent(
